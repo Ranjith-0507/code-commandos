@@ -1,0 +1,1902 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Operator Hourly Report</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+      .chart-container {
+        margin: 20px auto;
+        max-width: 100%;
+      }
+
+      .graph-box {
+        overflow-x: auto;
+        overflow-y: hidden;
+        white-space: nowrap;
+        padding: 0;
+        border-radius: 10px;
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+        border: 2px solid #e0e0e0;
+        background-color: #f9f9f9;
+      }
+
+      .gantt-scroll-wrapper {
+        min-width: 2400px;
+      }
+
+      #gantt1 {
+        width: 2400px;
+        height: 350px;
+      }
+
+      .card-below {
+        margin-top: 20px;
+      }
+
+      .table-container {
+        border: 2px solid #e0e0e0;
+        border-radius: 10px;
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+        padding: 15px;
+        background-color: #ffffff;
+        overflow-y: auto;
+        max-height: 400px;
+      }
+
+      .draggable-row {
+        cursor: move;
+        background: linear-gradient(90deg, #28b8ff, #1e87ff);
+        color: white;
+        border-radius: 5px;
+        padding: 10px;
+      }
+
+      .draggable-row:hover {
+        transform: scale(1.02);
+        transition: transform 0.3s;
+      }
+
+      .action-icon {
+        cursor: pointer;
+        font-size: 1.2rem;
+        color: black;
+      }
+
+      .action-icon:hover {
+        color: #d3d3d3;
+      }
+
+      .floating-badge {
+        position: fixed;
+        background: linear-gradient(45deg, #28b8ff, #1e87ff);
+        color: white;
+        border-radius: 10px;
+        padding: 5px 15px;
+        font-size: 0.9rem;
+        cursor: move;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        z-index: 1000;
+        display: inline-block;
+        text-align: center;
+        max-width: 200px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .floating-badge:hover {
+        transform: scale(1.05);
+        transition: transform 0.3s;
+      }
+
+      .table th,
+      .table td {
+        font-size: 0.9rem;
+      }
+
+      .export-button {
+        background: linear-gradient(90deg, #28b8ff, #1e87ff);
+        color: white;
+        border: none;
+        border-radius: 5px;
+        padding: 10px 20px;
+        font-size: 1rem;
+        cursor: pointer;
+      }
+
+      .export-button:hover {
+        background: linear-gradient(90deg, #1e87ff, #28b8ff);
+        transform: scale(1.05);
+        transition: transform 0.3s;
+      }
+
+      .controls-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 20px;
+      }
+
+      .controls-row input {
+        padding: 8px 16px;
+        border-radius: 5px;
+        border: 1px solid #e0e0e0;
+        font-size: 1rem;
+      }
+
+      .controls-row input:disabled {
+        background-color: #d3d3d3;
+        cursor: not-allowed;
+      }
+
+      .workload-container {
+        margin: 0;
+        padding: 10px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        justify-content: center;
+      }
+
+      .workload-item {
+        padding: 8px 12px;
+        margin: 5px;
+        border-radius: 5px;
+        color: white;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 120px;
+        max-width: 200px;
+        flex: 1 1 auto;
+        text-align: center;
+        font-size: 0.9rem;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+
+      .operator-select,
+      .time-picker {
+        width: 100%;
+        padding: 5px;
+        border: none;
+        background: transparent;
+        color: black;
+        font-size: 0.9rem;
+      }
+
+      .operator-select:focus,
+      .time-picker:focus {
+        outline: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h2 class="text-center mb-4">Operator Process Sheet</h2>
+      <div class="controls-row">
+        <button class="export-button" onclick="exportGanttData()">
+          Export Operator Process Sheet
+        </button>
+        <input
+          type="date"
+          id="datePicker"
+          value="2025-08-11"
+          min="2025-08-11"
+        />
+      </div>
+      <div class="workload-container graph-box" id="workloadDisplay"></div>
+      <div class="chart-container">
+        <div class="graph-box">
+          <div class="gantt-scroll-wrapper">
+            <canvas id="gantt1"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div class="row card-below">
+        <div class="table-container">
+          <table class="table table-striped" id="moTable">
+            <thead style="text-align: center">
+              <tr>
+                <th style="background-color: #1e87ff; color: white">
+                  Order Number
+                </th>
+                <th style="background-color: #1e87ff; color: white">
+                  Operator ID
+                </th>
+                <th style="background-color: #1e87ff; color: white">
+                  Start Time
+                </th>
+                <th style="background-color: #1e87ff; color: white">
+                  Customer
+                </th>
+                <th style="background-color: #1e87ff; color: white">
+                  ProductNo
+                </th>
+                <th style="background-color: #1e87ff; color: white">
+                  ProductName
+                </th>
+                <th style="background-color: #1e87ff; color: white">DueDate</th>
+                <th style="background-color: #1e87ff; color: white">Qty</th>
+                <th style="background-color: #1e87ff; color: white">
+                  Total Time
+                </th>
+              </tr>
+            </thead>
+            <tbody id="moTableBody" style="text-align: center">
+              <tr
+                class="draggable-row"
+                draggable="true"
+                data-mo="order00019047"
+                data-operator="O1"
+                data-start="06:00:00"
+                data-end="07:20:00"
+                data-duration="01:20:00"
+                data-label="802176-01-01-03-01"
+              >
+                <td style="background-color: #2f6aad; color: white">
+                  order00019047
+                </td>
+                <td>
+                  <select class="operator-select">
+                    <option value="" disabled>Select Operator</option>
+                    <option value="O1" selected>O1</option>
+                    <option value="O2">O2</option>
+                    <option value="O3">O3</option>
+                  </select>
+                </td>
+                <td>
+                  <input
+                    type="time"
+                    class="time-picker"
+                    step="1"
+                    value="06:00:00"
+                  />
+                </td>
+                <td>XXXX</td>
+                <td>802176-01-01-03-01</td>
+                <td>ﾅｰｽｶｰﾄ(ﾄﾚｰ支柱ﾊﾟｲﾌﾟ)L(LF)</td>
+                <td>29-08-2025</td>
+                <td>9</td>
+                <td>01:20:00</td>
+              </tr>
+              <tr
+                class="draggable-row"
+                draggable="true"
+                data-mo="order00019200"
+                data-operator="O2"
+                data-start="06:00:00"
+                data-end="06:20:00"
+                data-duration="00:20:00"
+                data-label="SHOP3"
+              >
+                <td style="background-color: #2f6aad; color: white">
+                  order00019200
+                </td>
+                <td>
+                  <select class="operator-select">
+                    <option value="" disabled>Select Operator</option>
+                    <option value="O1">O1</option>
+                    <option value="O2" selected>O2</option>
+                    <option value="O3">O3</option>
+                  </select>
+                </td>
+                <td>
+                  <input
+                    type="time"
+                    class="time-picker"
+                    step="1"
+                    value="06:00:00"
+                  />
+                </td>
+                <td>XXXX</td>
+                <td>SHOP3</td>
+                <td>試作S3</td>
+                <td>04-08-2025</td>
+                <td>1</td>
+                <td>00:20:00</td>
+              </tr>
+              <tr
+                class="draggable-row"
+                draggable="true"
+                data-mo="order00019205"
+                data-operator=""
+                data-start="00:00:00"
+                data-end="00:45:00"
+                data-duration="00:45:00"
+                data-label="SHOP3"
+              >
+                <td style="background-color: #2f6aad; color: white">
+                  order00019205
+                </td>
+                <td>
+                  <select class="operator-select">
+                    <option value="" selected disabled>Select Operator</option>
+                    <option value="O1">O1</option>
+                    <option value="O2">O2</option>
+                    <option value="O3">O3</option>
+                  </select>
+                </td>
+                <td>
+                  <input
+                    type="time"
+                    class="time-picker"
+                    step="1"
+                    value="00:00:00"
+                  />
+                </td>
+                <td>XXXX</td>
+                <td>SHOP3</td>
+                <td>試作S3</td>
+                <td>06-08-2025</td>
+                <td>1</td>
+                <td>00:45:00</td>
+              </tr>
+              <tr
+                class="draggable-row"
+                draggable="true"
+                data-mo="order00018948"
+                data-operator=""
+                data-start="00:00:00"
+                data-end="01:10:00"
+                data-duration="01:10:00"
+                data-label="990121-04-01-01"
+              >
+                <td style="background-color: #2f6aad; color: white">
+                  order00018948
+                </td>
+                <td>
+                  <select class="operator-select">
+                    <option value="" selected disabled>Select Operator</option>
+                    <option value="O1">O1</option>
+                    <option value="O2">O2</option>
+                    <option value="O3">O3</option>
+                  </select>
+                </td>
+                <td>
+                  <input
+                    type="time"
+                    class="time-picker"
+                    step="1"
+                    value="00:00:00"
+                  />
+                </td>
+                <td>XXXX</td>
+                <td>990121-04-01-01</td>
+                <td>BBF-R934(補強)L(LF)</td>
+                <td>19-08-2025</td>
+                <td>60</td>
+                <td>01:10:00</td>
+              </tr>
+              <tr
+                class="draggable-row"
+                draggable="true"
+                data-mo="order00019030"
+                data-operator=""
+                data-start="00:00:00"
+                data-end="00:05:00"
+                data-duration="00:05:00"
+                data-label="801268-02-01-01-01-01"
+              >
+                <td style="background-color: #2f6aad; color: white">
+                  order00019030
+                </td>
+                <td>
+                  <select class="operator-select">
+                    <option value="" selected disabled>Select Operator</option>
+                    <option value="O1">O1</option>
+                    <option value="O2">O2</option>
+                    <option value="O3">O3</option>
+                  </select>
+                </td>
+                <td>
+                  <input
+                    type="time"
+                    class="time-picker"
+                    step="1"
+                    value="00:00:00"
+                  />
+                </td>
+                <td>XXXX</td>
+                <td>801268-02-01-01-01-01</td>
+                <td>PMNB-S0914,6U21(下ﾌﾚｰﾑ)L(F)</td>
+                <td>22-08-2025</td>
+                <td>50</td>
+                <td>00:05:00</td>
+              </tr>
+              <tr
+                class="draggable-row"
+                draggable="true"
+                data-mo="order00018992"
+                data-operator=""
+                data-start="00:00:00"
+                data-end="01:00:00"
+                data-duration="01:00:00"
+                data-label="990122-04-01-01"
+              >
+                <td style="background-color: #2f6aad; color: white">
+                  order00018992
+                </td>
+                <td>
+                  <select class="operator-select">
+                    <option value="" selected disabled>Select Operator</option>
+                    <option value="O1">O1</option>
+                    <option value="O2">O2</option>
+                    <option value="O3">O3</option>
+                  </select>
+                </td>
+                <td>
+                  <input
+                    type="time"
+                    class="time-picker"
+                    step="1"
+                    value="00:00:00"
+                  />
+                </td>
+                <td>XXXX</td>
+                <td>990122-04-01-01</td>
+                <td>BBF-R936(補強)L(LF)</td>
+                <td>26-08-2025</td>
+                <td>60</td>
+                <td>01:00:00</td>
+              </tr>
+              <tr
+                class="draggable-row"
+                draggable="true"
+                data-mo="order00019003"
+                data-operator=""
+                data-start="00:00:00"
+                data-end="00:23:00"
+                data-duration="00:23:00"
+                data-label="990122-04-01-01"
+              >
+                <td style="background-color: #2f6aad; color: white">
+                  order00019003
+                </td>
+                <td>
+                  <select class="operator-select">
+                    <option value="" selected disabled>Select Operator</option>
+                    <option value="O1">O1</option>
+                    <option value="O2">O2</option>
+                    <option value="O3">O3</option>
+                  </select>
+                </td>
+                <td>
+                  <input
+                    type="time"
+                    class="time-picker"
+                    step="1"
+                    value="00:00:00"
+                  />
+                </td>
+                <td>XXXX</td>
+                <td>990122-04-01-01</td>
+                <td>BBF-R936(補強)L(LF)</td>
+                <td>28-08-2025</td>
+                <td>60</td>
+                <td>00:23:00</td>
+              </tr>
+              <tr
+                class="draggable-row"
+                draggable="true"
+                data-mo="order00019197"
+                data-operator=""
+                data-start="00:00:00"
+                data-end="00:46:00"
+                data-duration="00:46:00"
+                data-label="SHOP3"
+              >
+                <td style="background-color: #2f6aad; color: white">
+                  order00019197
+                </td>
+                <td>
+                  <select class="operator-select">
+                    <option value="" selected disabled>Select Operator</option>
+                    <option value="O1">O1</option>
+                    <option value="O2">O2</option>
+                    <option value="O3">O3</option>
+                  </select>
+                </td>
+                <td>
+                  <input
+                    type="time"
+                    class="time-picker"
+                    step="1"
+                    value="00:00:00"
+                  />
+                </td>
+                <td>XXXX</td>
+                <td>SHOP3</td>
+                <td>試作S3</td>
+                <td>04-08-2025</td>
+                <td>1</td>
+                <td>00:46:00</td>
+              </tr>
+              <tr
+                class="draggable-row"
+                draggable="true"
+                data-mo="order00019072"
+                data-operator=""
+                data-start="00:00:00"
+                data-end="00:54:00"
+                data-duration="00:54:00"
+                data-label="SHOP3"
+              >
+                <td style="background-color: #2f6aad; color: white">
+                  order00019072
+                </td>
+                <td>
+                  <select class="operator-select">
+                    <option value="" selected disabled>Select Operator</option>
+                    <option value="O1">O1</option>
+                    <option value="O2">O2</option>
+                    <option value="O3">O3</option>
+                  </select>
+                </td>
+                <td>
+                  <input
+                    type="time"
+                    class="time-picker"
+                    step="1"
+                    value="00:00:00"
+                  />
+                </td>
+                <td>XXXX</td>
+                <td>SHOP3</td>
+                <td>試作S3</td>
+                <td>06-08-2025</td>
+                <td>20</td>
+                <td>00:54:00</td>
+              </tr>
+              <tr
+                class="draggable-row"
+                draggable="true"
+                data-mo="order00019249:801091-02-01"
+                data-operator=""
+                data-start="00:00:00"
+                data-end="00:29:00"
+                data-duration="00:29:00"
+                data-label="801091-02-01"
+              >
+                <td style="background-color: #2f6aad; color: white">
+                  order00019249:801091-02-01
+                </td>
+                <td>
+                  <select class="operator-select">
+                    <option value="" selected disabled>Select Operator</option>
+                    <option value="O1">O1</option>
+                    <option value="O2">O2</option>
+                    <option value="O3">O3</option>
+                  </select>
+                </td>
+                <td>
+                  <input
+                    type="time"
+                    class="time-picker"
+                    step="1"
+                    value="00:00:00"
+                  />
+                </td>
+                <td>XXXX</td>
+                <td>801091-02-01</td>
+                <td>CW-31T(横支柱φ22.2xt1.6)L(LF)</td>
+                <td>02-09-2025</td>
+                <td>200</td>
+                <td>00:29:00</td>
+              </tr>
+              <tr
+                class="draggable-row"
+                draggable="true"
+                data-mo="order00019249:801091-01-01-01"
+                data-operator=""
+                data-start="00:00:00"
+                data-end="00:46:00"
+                data-duration="00:46:00"
+                data-label="801091-01-01-01"
+              >
+                <td style="background-color: #2f6aad; color: white">
+                  order00019249:801091-01-01-01
+                </td>
+                <td>
+                  <select class="operator-select">
+                    <option value="" selected disabled>Select Operator</option>
+                    <option value="O1">O1</option>
+                    <option value="O2">O2</option>
+                    <option value="O3">O3</option>
+                  </select>
+                </td>
+                <td>
+                  <input
+                    type="time"
+                    class="time-picker"
+                    step="1"
+                    value="00:00:00"
+                  />
+                </td>
+                <td>XXXX</td>
+                <td>801091-01-1-01</td>
+                <td>CW-31T(ﾛﾉ字枠上下φ25.4xt1.6)L(LF)</td>
+                <td>02-09-2025</td>
+                <td>400</td>
+                <td>00:46:00</td>
+              </tr>
+              <tr
+                class="draggable-row"
+                draggable="true"
+                data-mo="order00019249:801091-03-01-01"
+                data-operator=""
+                data-start="00:00:00"
+                data-end="00:59:00"
+                data-duration="00:59:00"
+                data-label="801091-03-01-01"
+              >
+                <td style="background-color: #2f6aad; color: white">
+                  order00019249:801091-03-01-01
+                </td>
+                <td>
+                  <select class="operator-select">
+                    <option value="" selected disabled>Select Operator</option>
+                    <option value="O1">O1</option>
+                    <option value="O2">O2</option>
+                    <option value="O3">O3</option>
+                  </select>
+                </td>
+                <td>
+                  <input
+                    type="time"
+                    class="time-picker"
+                    step="1"
+                    value="00:00:00"
+                  />
+                </td>
+                <td>XXXX</td>
+                <td>801091-03-01-01</td>
+                <td>CW-31T(縦支柱φ22.2xt1.6)L(LF)</td>
+                <td>02-09-2025</td>
+                <td>1200</td>
+                <td>00:59:00</td>
+              </tr>
+              <tr
+                class="draggable-row"
+                draggable="true"
+                data-mo="order00019249:801091-03-01-01-2"
+                data-operator=""
+                data-start="00:00:00"
+                data-end="00:30:00"
+                data-duration="00:30:00"
+                data-label="801091-03-01-01"
+              >
+                <td style="background-color: #2f6aad; color: white">
+                  order00019249:801091-03-01-01-2
+                </td>
+                <td>
+                  <select class="operator-select">
+                    <option value="" selected disabled>Select Operator</option>
+                    <option value="O1">O1</option>
+                    <option value="O2">O2</option>
+                    <option value="O3">O3</option>
+                  </select>
+                </td>
+                <td>
+                  <input
+                    type="time"
+                    class="time-picker"
+                    step="1"
+                    value="00:00:00"
+                  />
+                </td>
+                <td>XXXX</td>
+                <td>801091-03-01-01</td>
+                <td>CW-31T(縦支柱φ22.2xt1.6)L(LF)</td>
+                <td>02-09-2025</td>
+                <td>1200</td>
+                <td>00:30:00</td>
+              </tr>
+              <tr
+                class="draggable-row"
+                draggable="true"
+                data-mo="order00019249:801091-01-01-01-2"
+                data-operator=""
+                data-start="00:00:00"
+                data-end="00:39:00"
+                data-duration="00:39:00"
+                data-label="801091-01-01-01"
+              >
+                <td style="background-color: #2f6aad; color: white">
+                  order00019249:801091-01-01-01-2
+                </td>
+                <td>
+                  <select class="operator-select">
+                    <option value="" selected disabled>Select Operator</option>
+                    <option value="O1">O1</option>
+                    <option value="O2">O2</option>
+                    <option value="O3">O3</option>
+                  </select>
+                </td>
+                <td>
+                  <input
+                    type="time"
+                    class="time-picker"
+                    step="1"
+                    value="00:00:00"
+                  />
+                </td>
+                <td>XXXX</td>
+                <td>801091-01-01-01</td>
+                <td>CW-31T(ﾛﾉ字枠上下φ25.4xt1.6)L(LF)</td>
+                <td>02-09-2025</td>
+                <td>400</td>
+                <td>00:39:00</td>
+              </tr>
+              <tr
+                class="draggable-row"
+                draggable="true"
+                data-mo="order00019249:801091-01-01-01-3"
+                data-operator=""
+                data-start="00:00:00"
+                data-end="01:39:00"
+                data-duration="01:39:00"
+                data-label="801091-01-01-01"
+              >
+                <td style="background-color: #2f6aad; color: white">
+                  order00019249:801091-01-01-01-3
+                </td>
+                <td>
+                  <select class="operator-select">
+                    <option value="" selected disabled>Select Operator</option>
+                    <option value="O1">O1</option>
+                    <option value="O2">O2</option>
+                    <option value="O3">O3</option>
+                  </select>
+                </td>
+                <td>
+                  <input
+                    type="time"
+                    class="time-picker"
+                    step="1"
+                    value="00:00:00"
+                  />
+                </td>
+                <td>XXXX</td>
+                <td>801091-01-01-01</td>
+                <td>CW-31T(ﾛﾉ字枠上下φ25.4xt1.6)L(LF)</td>
+                <td>02-09-2025</td>
+                <td>400</td>
+                <td>01:39:00</td>
+              </tr>
+              <tr
+                class="draggable-row"
+                draggable="true"
+                data-mo="order00019249:801091-01-01-01-4"
+                data-operator=""
+                data-start="00:00:00"
+                data-end="01:28:00"
+                data-duration="01:28:00"
+                data-label="801091-01-01-01"
+              >
+                <td style="background-color: #2f6aad; color: white">
+                  order00019249:801091-01-01-01-4
+                </td>
+                <td>
+                  <select class="operator-select">
+                    <option value="" selected disabled>Select Operator</option>
+                    <option value="O1">O1</option>
+                    <option value="O2">O2</option>
+                    <option value="O3">O3</option>
+                  </select>
+                </td>
+                <td>
+                  <input
+                    type="time"
+                    class="time-picker"
+                    step="1"
+                    value="00:00:00"
+                  />
+                </td>
+                <td>XXXX</td>
+                <td>801091-01-01-01</td>
+                <td>CW-31T(ﾛﾉ字枠上下φ25.4xt1.6)L(LF)</td>
+                <td>02-09-2025</td>
+                <td>400</td>
+                <td>01:28:00</td>
+              </tr>
+              <tr
+                class="draggable-row"
+                draggable="true"
+                data-mo="order00018430"
+                data-operator=""
+                data-start="00:00:00"
+                data-end="00:23:00"
+                data-duration="00:23:00"
+                data-label="802392-01-01-01-01-01-01"
+              >
+                <td style="background-color: #2f6aad; color: white">
+                  order00018430
+                </td>
+                <td>
+                  <select class="operator-select">
+                    <option value="" selected disabled>Select Operator</option>
+                    <option value="O1">O1</option>
+                    <option value="O2">O2</option>
+                    <option value="O3">O3</option>
+                  </select>
+                </td>
+                <td>
+                  <input
+                    type="time"
+                    class="time-picker"
+                    step="1"
+                    value="00:00:00"
+                  />
+                </td>
+                <td>XXXX</td>
+                <td>802392-01-01-01-01-01-01</td>
+                <td>ｷｬﾘｰﾛｯｸ部(ﾊﾟｲﾌﾟ)L(LF)</td>
+                <td>17-09-2025</td>
+                <td>100</td>
+                <td>00:23:00</td>
+              </tr>
+              <tr
+                class="draggable-row"
+                draggable="true"
+                data-mo="order00017832"
+                data-operator=""
+                data-start="00:00:00"
+                data-end="00:24:00"
+                data-duration="00:24:00"
+                data-label="802397-01-01-01-01-01"
+              >
+                <td style="background-color: #2f6aad; color: white">
+                  order00017832
+                </td>
+                <td>
+                  <select class="operator-select">
+                    <option value="" selected disabled>Select Operator</option>
+                    <option value="O1">O1</option>
+                    <option value="O2">O2</option>
+                    <option value="O3">O3</option>
+                  </select>
+                </td>
+                <td>
+                  <input
+                    type="time"
+                    class="time-picker"
+                    step="1"
+                    value="00:00:00"
+                  />
+                </td>
+                <td>XXXX</td>
+                <td>802397-01-01-01-01-01</td>
+                <td>移動ﾊﾝﾄﾞﾙCOMP(ﾊﾟｲﾌﾟ)L(LF)</td>
+                <td>22-08-2025</td>
+                <td>200</td>
+                <td>00:24:00</td>
+              </tr>
+              <tr
+                class="draggable-row"
+                draggable="true"
+                data-mo="order00018430:802392-01-01-01-01-01-01"
+                data-operator=""
+                data-start="00:00:00"
+                data-end="00:40:00"
+                data-duration="00:40:00"
+                data-label="802392-01-01-01-01-01-01"
+              >
+                <td style="background-color: #2f6aad; color: white">
+                  order00018430:802392-01-01-01-01-01-01
+                </td>
+                <td>
+                  <select class="operator-select">
+                    <option value="" selected disabled>Select Operator</option>
+                    <option value="O1">O1</option>
+                    <option value="O2">O2</option>
+                    <option value="O3">O3</option>
+                  </select>
+                </td>
+                <td>
+                  <input
+                    type="time"
+                    class="time-picker"
+                    step="1"
+                    value="00:00:00"
+                  />
+                </td>
+                <td>XXXX</td>
+                <td>802392-01-01-01-01-01-01</td>
+                <td>ｷｬﾘｰﾛｯｸ部(ﾊﾟｲﾌﾟ)L(LF)</td>
+                <td>17-09-2025</td>
+                <td>100</td>
+                <td>00:40:00</td>
+              </tr>
+              <tr
+                class="draggable-row"
+                draggable="true"
+                data-mo="order00019243"
+                data-operator=""
+                data-start="00:00:00"
+                data-end="01:10:00"
+                data-duration="01:10:00"
+                data-label="801788-02"
+              >
+                <td style="background-color: #2f6aad; color: white">
+                  order00019243
+                </td>
+                <td>
+                  <select class="operator-select">
+                    <option value="" selected disabled>Select Operator</option>
+                    <option value="O1">O1</option>
+                    <option value="O2">O2</option>
+                    <option value="O3">O3</option>
+                  </select>
+                </td>
+                <td>
+                  <input
+                    type="time"
+                    class="time-picker"
+                    step="1"
+                    value="00:00:00"
+                  />
+                </td>
+                <td>XXXX</td>
+                <td>801788-02</td>
+                <td>(φ19.1xt2.0xL33)L(LF)</td>
+                <td>20-08-2025</td>
+                <td>30</td>
+                <td>01:10:00</td>
+              </tr>
+              <tr
+                class="draggable-row"
+                draggable="true"
+                data-mo="order00018625"
+                data-operator=""
+                data-start="00:00:00"
+                data-end="01:11:00"
+                data-duration="01:11:00"
+                data-label="802457-01-01-01-01"
+              >
+                <td style="background-color: #2f6aad; color: white">
+                  order00018625
+                </td>
+                <td>
+                  <select class="operator-select">
+                    <option value="" selected disabled>Select Operator</option>
+                    <option value="O1">O1</option>
+                    <option value="O2">O2</option>
+                    <option value="O3">O3</option>
+                  </select>
+                </td>
+                <td>
+                  <input
+                    type="time"
+                    class="time-picker"
+                    step="1"
+                    value="00:00:00"
+                  />
+                </td>
+                <td>XXXX</td>
+                <td>802457-01-01-01-01</td>
+                <td>ﾁｪｱﾌﾚｰﾑﾊﾟｲﾌﾟ_L(ﾊﾟｲﾌﾟ)L(LF)</td>
+                <td>08-10-2025</td>
+                <td>100</td>
+                <td>01:11:00</td>
+              </tr>
+              <tr
+                class="draggable-row"
+                draggable="true"
+                data-mo="order00018626"
+                data-operator=""
+                data-start="00:00:00"
+                data-end="00:50:00"
+                data-duration="00:50:00"
+                data-label="802458-01-01-01-01"
+              >
+                <td style="background-color: #2f6aad; color: white">
+                  order00018626
+                </td>
+                <td>
+                  <select class="operator-select">
+                    <option value="" selected disabled>Select Operator</option>
+                    <option value="O1">O1</option>
+                    <option value="O2">O2</option>
+                    <option value="O3">O3</option>
+                  </select>
+                </td>
+                <td>
+                  <input
+                    type="time"
+                    class="time-picker"
+                    step="1"
+                    value="00:00:00"
+                  />
+                </td>
+                <td>XXXX</td>
+                <td>802458-01-01-01-01</td>
+                <td>ﾁｪｱﾌﾚｰﾑﾊﾟｲﾌﾟ_R(ﾊﾟｲﾌﾟ)L(LF)</td>
+                <td>08-10-2025</td>
+                <td>100</td>
+                <td>00:50:00</td>
+              </tr>
+              <tr
+                class="draggable-row"
+                draggable="true"
+                data-mo="order00018621"
+                data-operator=""
+                data-start="00:00:00"
+                data-end="01:10:00"
+                data-duration="01:10:00"
+                data-label="802392-01-01-01-01-01-01"
+              >
+                <td style="background-color: #2f6aad; color: white">
+                  order00018621
+                </td>
+                <td>
+                  <select class="operator-select">
+                    <option value="" selected disabled>Select Operator</option>
+                    <option value="O1">O1</option>
+                    <option value="O2">O2</option>
+                    <option value="O3">O3</option>
+                  </select>
+                </td>
+                <td>
+                  <input
+                    type="time"
+                    class="time-picker"
+                    step="1"
+                    value="00:00:00"
+                  />
+                </td>
+                <td>XXXX</td>
+                <td>802392-01-01-01-01-01-01</td>
+                <td>ｷｬﾘｰﾛｯｸ部(ﾊﾟｲﾌﾟ)L(LF)</td>
+                <td>05-11-2025</td>
+                <td>100</td>
+                <td>01:10:00</td>
+              </tr>
+              <tr
+                class="draggable-row"
+                draggable="true"
+                data-mo="order00019251"
+                data-operator=""
+                data-start="00:00:00"
+                data-end="00:11:00"
+                data-duration="00:11:00"
+                data-label="SHOP3"
+              >
+                <td style="background-color: #2f6aad; color: white">
+                  order00019251
+                </td>
+                <td>
+                  <select class="operator-select">
+                    <option value="" selected disabled>Select Operator</option>
+                    <option value="O1">O1</option>
+                    <option value="O2">O2</option>
+                    <option value="O3">O3</option>
+                  </select>
+                </td>
+                <td>
+                  <input
+                    type="time"
+                    class="time-picker"
+                    step="1"
+                    value="00:00:00"
+                  />
+                </td>
+                <td>XXXX</td>
+                <td>SHOP3</td>
+                <td>試作S3</td>
+                <td>05-08-2025</td>
+                <td>1</td>
+                <td>00:11:00</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const canvas = document.getElementById("gantt1");
+      const ctx = canvas.getContext("2d");
+      const originalRowsMap = {};
+      let badgeCount = 0;
+      let selectedTask = null;
+      let lastClickTime = 0;
+      let isOrangeMode = false;
+      let clickCount = 0;
+      let lastClickedTask = null;
+      const tripleClickThreshold = 300; // ms
+      let currentDate = new Date("2025-08-11");
+
+      // Gantt chart configuration
+      const chartWidth = 2400;
+      const chartHeight = 350;
+      const leftOffset = 80;
+      const topOffset = 70;
+      const rowHeight = (chartHeight - topOffset) / 3;
+      const totalMinutes = 24 * 60;
+      const pixelsPerMinute = (chartWidth - leftOffset) / totalMinutes;
+      const operators = ["O1", "O2", "O3"];
+      let tasks = [];
+      const gapBetweenBars = 2;
+      const maxWorkHours = 8 * 60; // 8 hours in minutes
+
+      function setCanvasResolution() {
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = chartWidth * dpr;
+        canvas.height = chartHeight * dpr;
+        canvas.style.width = `${chartWidth}px`;
+        canvas.style.height = `${chartHeight}px`;
+        ctx.scale(dpr, dpr);
+      }
+
+      function timeToMinutes(time) {
+        const [hours, minutes, seconds = 0] = time.split(":").map(Number);
+        return hours * 60 + minutes + seconds / 60;
+      }
+
+      function minutesToTime(minutes) {
+        minutes = Math.min(Math.max(minutes, 0), 24 * 60 - 1);
+        const hours = Math.floor(minutes / 60)
+          .toString()
+          .padStart(2, "0");
+        const mins = Math.floor(minutes % 60)
+          .toString()
+          .padStart(2, "0");
+        const secs = Math.floor((minutes % 1) * 60)
+          .toString()
+          .padStart(2, "0");
+        return `${hours}:${mins}:${secs}`;
+      }
+
+      function calculateEndTime(startTime, duration) {
+        const startMinutes = timeToMinutes(startTime);
+        const [durHours, durMinutes, durSeconds] = duration
+          .split(":")
+          .map(Number);
+        const durationMinutes = durHours * 60 + durMinutes + durSeconds / 60;
+        let endMinutes = startMinutes + durationMinutes;
+        endMinutes %= 24 * 60;
+        return minutesToTime(endMinutes);
+      }
+
+      function calculateDuration(startTime, endTime) {
+        let startMinutes = timeToMinutes(startTime);
+        let endMinutes = timeToMinutes(endTime);
+        if (endMinutes < startMinutes) {
+          endMinutes += 24 * 60; // Handle overnight tasks
+        }
+        const durationMinutes = endMinutes - startMinutes;
+        const hours = Math.floor(durationMinutes / 60)
+          .toString()
+          .padStart(2, "0");
+        const minutes = Math.floor(durationMinutes % 60)
+          .toString()
+          .padStart(2, "0");
+        const seconds = Math.floor((durationMinutes % 1) * 60)
+          .toString()
+          .padStart(2, "0");
+        return `${hours}:${minutes}:${seconds}`;
+      }
+
+      function durationStrToMinutes(duration) {
+        const [h, m, s] = duration.split(":").map(Number);
+        return h * 60 + m + (s || 0) / 60;
+      }
+
+      function doTasksOverlap(task1, task2) {
+        const start1 = timeToMinutes(task1.start);
+        const end1 = timeToMinutes(task1.end);
+        const start2 = timeToMinutes(task2.start);
+        const end2 = timeToMinutes(task2.end);
+        return start1 < end2 && end1 > start2;
+      }
+
+      // Build transitive overlap groups (connected components) and sort each group by start time
+      function groupTasksByOverlap(tasks) {
+        const remaining = tasks.slice();
+        const groups = [];
+        while (remaining.length > 0) {
+          const group = [remaining.shift()];
+          let added;
+          do {
+            added = false;
+            for (let i = remaining.length - 1; i >= 0; i--) {
+              const candidate = remaining[i];
+              if (group.some((t) => doTasksOverlap(t, candidate))) {
+                group.push(candidate);
+                remaining.splice(i, 1);
+                added = true;
+              }
+            }
+          } while (added);
+          group.sort((a, b) => {
+            const sa = timeToMinutes(a.start);
+            const sb = timeToMinutes(b.start);
+            if (sa !== sb) return sa - sb;
+            return timeToMinutes(a.end) - timeToMinutes(b.end);
+          });
+          groups.push(group);
+        }
+        return groups;
+      }
+
+      function calculateWorkload() {
+        const workload = {};
+        operators.forEach((op) => (workload[op] = 0));
+        tasks.forEach((task) => {
+          if (task.date === currentDate.toISOString().split("T")[0]) {
+            const minutes = durationStrToMinutes(
+              calculateDuration(task.start, task.end)
+            );
+            workload[task.processid] = (workload[task.processid] || 0) + minutes;
+          }
+        });
+
+        const workloadDisplay = document.getElementById("workloadDisplay");
+        workloadDisplay.innerHTML = "";
+        operators.forEach((op) => {
+          const minutes = workload[op] || 0;
+          const percentage = ((minutes / maxWorkHours) * 100).toFixed(2);
+          let gradient;
+          if (minutes <= maxWorkHours) {
+            gradient = "linear-gradient(90deg, #28b8ff, #1e87ff)"; // Normal: Blue gradient
+          } else if (minutes <= maxWorkHours * 1.2) {
+            gradient = "linear-gradient(90deg, #ffd700, #ffaa00)"; // Slightly over: Yellow gradient
+          } else if (minutes <= maxWorkHours * 1.4) {
+            gradient = "linear-gradient(90deg, #ff8c00, #ff4500)"; // Moderately over: Orange gradient
+          } else {
+            gradient = "linear-gradient(90deg, #ff4500, #dc143c)"; // Severely over: Red gradient
+          }
+          const div = document.createElement("div");
+          div.className = "workload-item";
+          div.style.background = gradient;
+          div.innerText = `${op}: ${Math.round(minutes)} min (${percentage}%)`;
+          workloadDisplay.appendChild(div);
+        });
+      }
+
+      function drawGanttChart() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "#f9f9f9";
+        ctx.fillRect(0, 0, chartWidth, chartHeight);
+        ctx.strokeStyle = "#e0e0e0";
+        ctx.lineWidth = 1;
+
+        const isPastDate = new Date(currentDate) < new Date("2025-08-11");
+        ctx.globalAlpha = isPastDate ? 0.5 : 1.0;
+
+        ctx.fillStyle = "#00FF00";
+        ctx.fillRect(0, topOffset, leftOffset, chartHeight - topOffset);
+        ctx.strokeRect(0, topOffset, chartWidth, chartHeight - topOffset);
+
+        for (let i = 0; i < 3; i++) {
+          const y = topOffset + i * rowHeight;
+          ctx.beginPath();
+          ctx.moveTo(leftOffset, Math.floor(y));
+          ctx.lineTo(chartWidth, Math.floor(y));
+          ctx.stroke();
+          const img = new Image();
+          img.src = "https://cdn-icons-png.flaticon.com/512/6008/6008234.png";
+          img.onload = () => {
+            const imgWidth = 50;
+            const imgHeight = 50;
+            const imgX = (leftOffset - imgWidth) / 2;
+            const imgY = y + (rowHeight - imgHeight) / 2;
+            ctx.drawImage(img, imgX, imgY, imgWidth, imgHeight);
+            ctx.strokeRect(imgX, imgY, imgWidth, imgHeight);
+          };
+        }
+
+        ctx.fillStyle = "#000";
+        ctx.font = "14px Arial";
+        ctx.fillText("AM", leftOffset + (12 * 60 * pixelsPerMinute) / 2, 20);
+        ctx.fillText("PM", leftOffset + (36 * 60 * pixelsPerMinute) / 2, 20);
+
+        for (let i = 0; i <= 24; i++) {
+          const x = leftOffset + i * 60 * pixelsPerMinute;
+          ctx.beginPath();
+          ctx.moveTo(Math.floor(x), topOffset - 30);
+          ctx.lineTo(Math.floor(x), chartHeight);
+          ctx.stroke();
+          ctx.fillStyle = "#000";
+          ctx.font = "12px Arial";
+          ctx.fillText(`${i}:00`, Math.floor(x), topOffset - 40);
+        }
+
+        const minuteLabels = ["00", "10", "20", "30", "40", "50"];
+        for (let i = 0; i < 144; i++) {
+          const x = leftOffset + i * 10 * pixelsPerMinute;
+          ctx.beginPath();
+          ctx.moveTo(Math.floor(x), topOffset - 10);
+          ctx.lineTo(Math.floor(x), chartHeight);
+          ctx.strokeStyle = i % 6 === 0 ? "#e0e0e0" : "#f0f0f0";
+          ctx.stroke();
+          if (i % 6 !== 0) {
+            ctx.fillStyle = "#000";
+            ctx.font = "12px Arial";
+            ctx.fillText(minuteLabels[i % 6], Math.floor(x), topOffset - 15);
+          }
+        }
+
+        const tasksByOperator = {};
+        tasks.forEach((task) => {
+          if (task.date === currentDate.toISOString().split("T")[0]) {
+            if (!tasksByOperator[task.processid]) {
+              tasksByOperator[task.processid] = [];
+            }
+            tasksByOperator[task.processid].push(task);
+          }
+        });
+
+        Object.keys(tasksByOperator).forEach((operator) => {
+          const operatorIndex = operators.indexOf(operator);
+          const yBase = topOffset + operatorIndex * rowHeight;
+          const operatorTasks = tasksByOperator[operator];
+          const taskGroups = groupTasksByOverlap(operatorTasks);
+
+          taskGroups.forEach((group) => {
+            const numTasks = group.length;
+            const subRowHeight =
+              numTasks === 1
+                ? rowHeight / 4
+                : (rowHeight - gapBetweenBars * (numTasks - 1)) / numTasks;
+
+            group.forEach((task, index) => {
+              const startMinutes = timeToMinutes(task.start);
+              const endMinutes = timeToMinutes(task.end);
+              const x = leftOffset + startMinutes * pixelsPerMinute;
+              const width = (endMinutes - startMinutes) * pixelsPerMinute;
+              const y = yBase + index * (subRowHeight + gapBetweenBars);
+              ctx.fillStyle = task.isOrange
+                ? "#FFA500"
+                : task.selected
+                ? "#00FF00"
+                : "#1e87ff";
+              ctx.fillRect(
+                Math.floor(x),
+                Math.floor(y),
+                Math.floor(width),
+                subRowHeight
+              );
+              ctx.fillStyle = "#FFFFFF";
+              ctx.font = "8px Arial";
+              ctx.fillText(
+                task.label,
+                Math.floor(x) + 5,
+                Math.floor(y) + subRowHeight / 2 + 3
+              );
+            });
+          });
+        });
+
+        ctx.globalAlpha = 1.0;
+        calculateWorkload();
+      }
+
+      function addFloatingBadge(taskData) {
+        const badge = document.createElement("div");
+        badge.className = "floating-badge";
+        badge.setAttribute("draggable", "true");
+        badge.setAttribute("data-mo", taskData.mo);
+        badge.setAttribute("data-start", taskData.start);
+        badge.setAttribute("data-end", taskData.end);
+        badge.setAttribute("data-duration", taskData.duration);
+        badge.setAttribute("data-label", taskData.product || taskData.mo);
+        badge.setAttribute("data-operator", taskData.operator); // Store operator ID
+        badge.innerHTML = taskData.product || taskData.mo;
+
+        const baseRight = 20;
+        const baseTop = 100;
+        const verticalOffset = badgeCount * 40;
+        badge.style.right = `${baseRight}px`;
+        badge.style.top = `${baseTop + verticalOffset}px`;
+        badgeCount++;
+
+        document.body.appendChild(badge);
+
+        badge.addEventListener("dragstart", (e) => {
+          const target = e.target;
+          const mo = target.getAttribute("data-mo");
+          const start = target.getAttribute("data-start");
+          const end = target.getAttribute("data-end");
+          const duration = target.getAttribute("data-duration");
+          const operator = target.getAttribute("data-operator"); // Retrieve operator ID
+          const label = originalRowsMap[mo].product;
+          e.dataTransfer.setData(
+            "text/plain",
+            JSON.stringify({ mo, start, end, duration, label, operator })
+          );
+        });
+      }
+
+      function downloadExcel(jsonData) {
+        try {
+          if (!Array.isArray(jsonData)) {
+            alert("Please provide a valid JSON array");
+            return;
+          }
+          const worksheet = XLSX.utils.json_to_sheet(jsonData);
+          const workbook = XLSX.utils.book_new();
+          XLSX.utils.book_append_sheet(workbook, worksheet, "Sheet1");
+          XLSX.writeFile(workbook, "Operator-Assigned-Tasks.xlsx");
+        } catch (error) {
+          alert("Error generating Excel file!");
+          console.error(error);
+        }
+      }
+
+      function exportGanttData() {
+        const taskData = tasks.map((task, index) => ({
+          taskId: index + 1,
+          operator: task.processid,
+          productNo: task.label,
+          startTime: task.start,
+          endTime: task.end,
+          date: task.date,
+        }));
+        console.log("Gantt Chart Task Details (JSON):");
+        console.log(JSON.stringify(taskData, null, 2));
+        downloadExcel(taskData);
+      }
+
+      function initializeTasks() {
+        tasks = []; // Initialize tasks as empty; no default tasks in Gantt chart
+        document.querySelectorAll(".draggable-row").forEach((row) => {
+          const mo = row.getAttribute("data-mo");
+          const cells = row.querySelectorAll("td");
+          originalRowsMap[mo] = {
+            mo,
+            operator: row.getAttribute("data-operator") || "",
+            customer: cells[3].innerText,
+            product: cells[4].innerText,
+            productName: cells[5].innerText,
+            dueDate: cells[6].innerText,
+            qty: cells[7].innerText,
+            duration: cells[8].innerText,
+            start: row.getAttribute("data-start"),
+            end: row.getAttribute("data-end"),
+            fullLabel: `${cells[4].innerText}:${mo}:${cells[5].innerText}:${cells[7].innerText}:${cells[6].innerText}:${cells[3].innerText}`,
+          };
+        });
+        drawGanttChart();
+      }
+
+      function attachRowEvents(row) {
+        row.addEventListener("dragstart", (e) => {
+          const target = e.target;
+          const mo = target.getAttribute("data-mo");
+          const start = target.getAttribute("data-start");
+          const end = target.getAttribute("data-end");
+          const duration = target.getAttribute("data-duration");
+          const operator = target.getAttribute("data-operator");
+          const label = originalRowsMap[mo].product;
+          e.dataTransfer.setData(
+            "text/plain",
+            JSON.stringify({ mo, start, end, duration, label, operator })
+          );
+        });
+
+        const operatorSelect = row.querySelector(".operator-select");
+        const timePicker = row.querySelector(".time-picker");
+        operatorSelect.addEventListener("change", (e) => {
+          const mo = row.getAttribute("data-mo");
+          const newOperator = e.target.value;
+          originalRowsMap[mo].operator = newOperator;
+          row.setAttribute("data-operator", newOperator);
+        });
+        timePicker.addEventListener("change", (e) => {
+          const mo = row.getAttribute("data-mo");
+          const newStart = e.target.value; // Full HH:mm:ss from time picker
+          originalRowsMap[mo].start = newStart;
+          originalRowsMap[mo].end = calculateEndTime(
+            newStart,
+            originalRowsMap[mo].duration
+          );
+          row.setAttribute("data-start", newStart);
+          row.setAttribute("data-end", originalRowsMap[mo].end);
+        });
+      }
+
+      document.querySelectorAll(".draggable-row").forEach(attachRowEvents);
+
+      canvas.addEventListener("click", (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const rawX = e.clientX - rect.left;
+        const rawY = e.clientY - rect.top;
+        const currentTime = Date.now();
+
+        const adjustedX = Math.max(0, rawX - leftOffset);
+        const adjustedY = Math.max(0, rawY - topOffset);
+
+        const rowIndex = Math.min(
+          Math.max(Math.floor(adjustedY / rowHeight), 0),
+          2
+        );
+        const processId = operators[rowIndex];
+
+        const minutes = Math.round(adjustedX / pixelsPerMinute);
+        const clickedTime = minutesToTime(minutes);
+
+        const tasksByOperator = {};
+        tasks.forEach((task) => {
+          if (!tasksByOperator[task.processid]) {
+            tasksByOperator[task.processid] = [];
+          }
+          tasksByOperator[task.processid].push(task);
+        });
+
+        // Precompute groups for consistent hit testing with drawing
+        const operatorGroupsCache = {};
+        Object.keys(tasksByOperator).forEach((op) => {
+          operatorGroupsCache[op] = groupTasksByOverlap(
+            tasksByOperator[op]
+          );
+        });
+
+        for (let i = 0; i < tasks.length; i++) {
+          const task = tasks[i];
+          if (task.date !== currentDate.toISOString().split("T")[0]) continue;
+          const startMinutes = timeToMinutes(task.start);
+          const endMinutes = timeToMinutes(task.end);
+          const x = leftOffset + startMinutes * pixelsPerMinute;
+          const width = (endMinutes - startMinutes) * pixelsPerMinute;
+          const operatorIndex = operators.indexOf(task.processid);
+          const yBase = topOffset + operatorIndex * rowHeight;
+
+          const groups = operatorGroupsCache[task.processid] || [];
+          const group = groups.find((g) => g.includes(task)) || [task];
+          const numTasks = group.length;
+          const subRowHeight =
+            numTasks === 1
+              ? rowHeight / 4
+              : (rowHeight - gapBetweenBars * (numTasks - 1)) / numTasks;
+          const taskIndex = group.indexOf(task);
+          const y = yBase + taskIndex * (subRowHeight + gapBetweenBars);
+
+          if (
+            rawX >= x &&
+            rawX <= x + width &&
+            rawY >= y &&
+            rawY <= y + subRowHeight
+          ) {
+            const isSameTask = lastClickedTask === task.label;
+            const timeDiff = currentTime - lastClickTime;
+
+            if (isSameTask && timeDiff < tripleClickThreshold) {
+              clickCount++;
+            } else {
+              clickCount = 1;
+              lastClickedTask = task.label;
+            }
+            lastClickTime = currentTime;
+
+            if (clickCount >= 3) {
+              console.log(
+                `Triple-clicked bar label: ${task.label}, converting to badge`
+              );
+              const taskData = {
+                mo: Object.keys(originalRowsMap).find(
+                  (key) => originalRowsMap[key].product === task.label
+                ),
+                start: task.start,
+                end: task.end,
+                duration: calculateDuration(task.start, task.end),
+                product: task.label,
+                operator: task.processid, // Include operator ID
+                fullLabel:
+                  originalRowsMap[
+                    Object.keys(originalRowsMap).find(
+                      (key) => originalRowsMap[key].product === task.label
+                    )
+                  ].fullLabel,
+              };
+              tasks.splice(i, 1);
+              addFloatingBadge(taskData);
+              selectedTask = null;
+              isOrangeMode = false;
+              clickCount = 0;
+              lastClickedTask = null;
+              drawGanttChart();
+              return;
+            } else if (clickCount === 2) {
+              tasks.forEach((t) => {
+                t.selected = false;
+                t.isOrange = false;
+              });
+              task.isOrange = true;
+              task.selected = false;
+              isOrangeMode = true;
+              selectedTask = { ...task, index: i };
+              console.log(
+                `Double-clicked: ${task.label} is now in orange mode`
+              );
+              drawGanttChart();
+              return;
+            } else {
+              console.log(`Clicked bar label: ${task.label}`);
+              tasks.forEach((t) => {
+                t.selected = false;
+                t.isOrange = false;
+              });
+              task.selected = true;
+              task.isOrange = false;
+              isOrangeMode = false;
+              selectedTask = { ...task, index: i };
+              drawGanttChart();
+              return;
+            }
+          }
+        }
+
+        if (isOrangeMode && selectedTask) {
+          const task = tasks[selectedTask.index];
+          const startMinutes = timeToMinutes(task.start);
+          const endMinutes = timeToMinutes(task.end);
+          const x = leftOffset + startMinutes * pixelsPerMinute;
+          const width = (endMinutes - startMinutes) * pixelsPerMinute;
+
+          if (rawX < x) {
+            task.start = clickedTime;
+            const mo = Object.keys(originalRowsMap).find(
+              (key) => originalRowsMap[key].product === task.label
+            );
+            originalRowsMap[mo].start = clickedTime;
+            originalRowsMap[mo].duration = calculateDuration(
+              task.start,
+              task.end
+            );
+            console.log(
+              `Orange mode: Changed start time for ${task.label} to ${clickedTime}`
+            );
+            task.isOrange = false;
+            isOrangeMode = false;
+            selectedTask = null;
+          } else if (rawX > x + width) {
+            task.end = clickedTime;
+            const mo = Object.keys(originalRowsMap).find(
+              (key) => originalRowsMap[key].product === task.label
+            );
+            originalRowsMap[mo].end = clickedTime;
+            originalRowsMap[mo].duration = calculateDuration(
+              task.start,
+              task.end
+            );
+            console.log(
+              `Orange mode: Increased end time for ${task.label} to ${clickedTime}`
+            );
+            task.isOrange = false;
+            isOrangeMode = false;
+            selectedTask = null;
+          } else if (rawX >= x && rawX <= x + width) {
+            task.end = clickedTime;
+            const mo = Object.keys(originalRowsMap).find(
+              (key) => originalRowsMap[key].product === task.label
+            );
+            originalRowsMap[mo].end = clickedTime;
+            originalRowsMap[mo].duration = calculateDuration(
+              task.start,
+              task.end
+            );
+            console.log(
+              `Orange mode: Decreased end time for ${task.label} to ${clickedTime}`
+            );
+            task.isOrange = false;
+            isOrangeMode = false;
+            selectedTask = null;
+          }
+          drawGanttChart();
+          return;
+        }
+
+        if (selectedTask && clickCount === 1) {
+          tasks.splice(selectedTask.index, 1);
+          const mo = Object.keys(originalRowsMap).find(
+            (key) => originalRowsMap[key].product === selectedTask.label
+          );
+          const duration = originalRowsMap[mo].duration;
+          const newEndTime = calculateEndTime(clickedTime, duration);
+          console.log(
+            `Moved task ${selectedTask.label} to new start time: ${clickedTime}, end time: ${newEndTime}`
+          );
+          tasks.push({
+            processid: processId,
+            start: clickedTime,
+            end: newEndTime,
+            label: selectedTask.label,
+            selected: false,
+            isOrange: false,
+            date: currentDate.toISOString().split("T")[0],
+          });
+          originalRowsMap[mo].start = clickedTime;
+          originalRowsMap[mo].end = newEndTime;
+          originalRowsMap[mo].operator = processId;
+          selectedTask = null;
+          drawGanttChart();
+        }
+      });
+
+      canvas.addEventListener("dragover", (e) => e.preventDefault());
+
+      canvas.addEventListener("drop", (e) => {
+        e.preventDefault();
+        const data = JSON.parse(e.dataTransfer.getData("text/plain"));
+        const rect = canvas.getBoundingClientRect();
+        const rawX = e.clientX - rect.left;
+        const rawY = e.clientY - rect.top;
+
+        const adjustedX = Math.max(0, rawX - leftOffset);
+        const adjustedY = Math.max(0, rawY - topOffset);
+
+        let processId;
+        if (data.operator && operators.includes(data.operator)) {
+          processId = data.operator; // Use the assigned operator if valid
+        } else {
+          const rowIndex = Math.min(
+            Math.max(Math.floor(adjustedY / rowHeight), 0),
+            2
+          );
+          processId = operators[rowIndex]; // Use the drop location's operator
+        }
+
+        const minutes = Math.round(adjustedX / pixelsPerMinute);
+        const newStartTime =
+          data.operator && operators.includes(data.operator)
+            ? data.start // Use table's start time if operator is assigned
+            : minutesToTime(minutes); // Use drop location's time if no operator
+        const newEndTime = calculateEndTime(newStartTime, data.duration);
+
+        const newTask = {
+          processid: processId,
+          start: newStartTime,
+          end: newEndTime,
+          label: data.label,
+          selected: false,
+          isOrange: false,
+          date: currentDate.toISOString().split("T")[0],
+        };
+        tasks.push(newTask);
+        console.log(
+          `Dropped task ${data.label} at operator ${processId}, start time: ${newStartTime}, end time: ${newEndTime}`
+        );
+        const rowToRemove = document.querySelector(`[data-mo="${data.mo}"]`);
+        const badgeToRemove = document.querySelector(
+          `.floating-badge[data-mo="${data.mo}"]`
+        );
+        if (rowToRemove) {
+          rowToRemove.setAttribute("data-start", newStartTime);
+          rowToRemove.setAttribute("data-end", newEndTime);
+          rowToRemove.setAttribute("data-operator", processId);
+          originalRowsMap[data.mo].start = newStartTime;
+          originalRowsMap[data.mo].end = newEndTime;
+          originalRowsMap[data.mo].operator = processId;
+          rowToRemove.remove();
+        }
+        if (badgeToRemove) {
+          badgeToRemove.remove();
+          badgeCount--;
+        }
+        drawGanttChart();
+      });
+
+      const tableBody = document.getElementById("moTableBody");
+      tableBody.addEventListener("dragover", (e) => e.preventDefault());
+
+      tableBody.addEventListener("drop", (e) => {
+        e.preventDefault();
+        let data;
+        if (selectedTask) {
+          const mo = Object.keys(originalRowsMap).find(
+            (key) => originalRowsMap[key].product === selectedTask.label
+          );
+          data = {
+            mo,
+            start: selectedTask.start,
+            end: selectedTask.end,
+            duration: calculateDuration(selectedTask.start, selectedTask.end),
+            label: selectedTask.label,
+            operator: selectedTask.processid, // Use the task's operator ID
+          };
+          tasks.splice(selectedTask.index, 1);
+          selectedTask = null;
+        } else {
+          data = JSON.parse(e.dataTransfer.getData("text/plain"));
+          tasks = tasks.filter(
+            (task) =>
+              !(
+                task.label === data.label &&
+                task.start === data.start &&
+                task.end === data.end &&
+                task.date === currentDate.toISOString().split("T")[0]
+              )
+          );
+        }
+
+        const rowData = originalRowsMap[data.mo];
+        if (rowData) {
+          const newRow = document.createElement("tr");
+          newRow.className = "draggable-row";
+          newRow.setAttribute("draggable", "true");
+          newRow.setAttribute("data-mo", rowData.mo);
+          newRow.setAttribute("data-operator", data.operator); // Set the operator ID
+          newRow.setAttribute("data-start", data.start);
+          newRow.setAttribute("data-end", data.end);
+          newRow.setAttribute("data-duration", data.duration);
+          newRow.setAttribute("data-label", rowData.product);
+          newRow.innerHTML = `
+            <td style="background-color: #2f6aad; color: white">${
+              rowData.mo
+            }</td>
+            <td>
+              <select class="operator-select">
+                <option value="" ${
+                  data.operator ? "" : "selected"
+                } disabled>Select Operator</option>
+                <option value="O1" ${
+                  data.operator === "O1" ? "selected" : ""
+                }>O1</option>
+                <option value="O2" ${
+                  data.operator === "O2" ? "selected" : ""
+                }>O2</option>
+                <option value="O3" ${
+                  data.operator === "O3" ? "selected" : ""
+                }>O3</option>
+              </select>
+            </td>
+            <td>
+              <input type="time" class="time-picker" step="1" value="${
+                data.start
+              }" />
+            </td>
+            <td>${rowData.customer}</td>
+            <td>${rowData.product}</td>
+            <td>${rowData.productName}</td>
+            <td>${rowData.dueDate}</td>
+            <td>${rowData.qty}</td>
+            <td>${data.duration}</td>
+          `;
+          tableBody.appendChild(newRow);
+          rowData.operator = data.operator; // Update operator in originalRowsMap
+          rowData.start = data.start;
+          rowData.end = data.end;
+          rowData.duration = data.duration;
+          attachRowEvents(newRow);
+          const badgeToRemove = document.querySelector(
+            `.floating-badge[data-mo="${data.mo}"]`
+          );
+          if (badgeToRemove) {
+            badgeToRemove.remove();
+            badgeCount--;
+          }
+          drawGanttChart();
+        }
+      });
+
+      document.getElementById("datePicker").addEventListener("change", (e) => {
+        const newDate = new Date(e.target.value);
+        if (newDate < new Date("2025-08-11")) {
+          e.target.value = "2025-08-11";
+          currentDate = new Date("2025-08-11");
+        } else {
+          currentDate = newDate;
+        }
+        drawGanttChart();
+      });
+
+      setCanvasResolution();
+      initializeTasks();
+      drawGanttChart();
+    </script>
+  </body>
+</html>
